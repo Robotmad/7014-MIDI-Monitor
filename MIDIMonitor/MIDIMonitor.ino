@@ -46,8 +46,10 @@
 #define WLAN_PASS       "coderdojo"
 #define WLAN_SECURITY   WLAN_SEC_WPA2
 #else
-#define WLAN_SSID       "BTHub5-HP6W"
-#define WLAN_PASS       "b49e7bec56"
+//#define WLAN_SSID       "BTHub5-HP6W"
+//#define WLAN_PASS       "b49e7bec56"
+#define WLAN_SSID       "Robotmad"
+#define WLAN_PASS       "mou3se43"
 #define WLAN_SECURITY   WLAN_SEC_WPA2
 #endif
 #define WLAN_RETRIES    (5)
