@@ -605,7 +605,7 @@ void processTimeouts(unsigned long timeNow)
     }
   }
 
-  if (SENTTime)
+  if (0 != SENTTime)
   {
     if (SENT_LED_TIMEOUT < (timeNow - SENTTime))
     {
