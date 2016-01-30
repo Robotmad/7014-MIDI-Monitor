@@ -119,11 +119,13 @@ Adafruit_CC3000 cc3000 = Adafruit_CC3000(ADAFRUIT_CC3000_CS, ADAFRUIT_CC3000_IRQ
 #define DECODE_KEY      1
 #define DECODE_VELOCITY 2
 
+#define MAX_KEY_VALUE (127)
 int RunningStatus = 0x90; // Default to Note On Events
 int DecodeState = DECODE_KEY;
 int Key = 0;
-int Velocity = 0;
+//int Velocity = 0;
 int DataBytesExpected = 0;
+short int NotesPlayed[MAX_KEY_VALUE+1];
 
 // Control Parameters
 unsigned int u16MinSessionSeconds;
@@ -187,7 +189,7 @@ void setup()
 #endif  
   {
     delay(1000);    
-    Serial.println(F("\nDebug"));
+    Serial.println(F("\nD"));
     bDebug = true;
     u16MinSessionSeconds = DEBUG_SESSION_DURATION;
 #ifdef DEBUG_LED 
@@ -236,7 +238,7 @@ void setup()
 #ifdef _IFTTT
   setupIFTTT();
 #endif
-  Serial.println(F("\nReady"));
+  Serial.println(F("\nR"));
 }
 
 #define NUM_LEDS      (4)   // number of  LEDs in test sequence
@@ -275,7 +277,7 @@ void loop()
 // detected that WIFI is connected
 void eventWIFIConnected(unsigned long tNow)
 {      
-  Serial.println(F("\nWIFI connect"));
+  Serial.println(F("\nWIFI"));
   digitalWrite(WIFI_LED, LOW);  
   bWIFIConnected = true;
   WIFIconnectedTime = tNow;
@@ -284,7 +286,7 @@ void eventWIFIConnected(unsigned long tNow)
 // Lost WIFI connection
 void eventWIFIDropped(unsigned long tNow)
 {
-  Serial.println(F("\nWIFI drop"));
+  Serial.println(F("\n!WIFI"));
   digitalWrite(WIFI_LED, HIGH);
   bWIFIConnected = false;
   WIFIconnectedTime = 0;
@@ -293,7 +295,7 @@ void eventWIFIDropped(unsigned long tNow)
 // detected that MIDI is connected
 void eventMIDIConnected(unsigned long tNow)
 {      
-  Serial.println(F("\nMIDI connect"));
+  Serial.println(F("\nMIDI"));
   digitalWrite(MIDI_LED, LOW);
 #ifndef NOTE_LED
   bNOTELEDState = true; // MIDI LED doubles up as NOTE LED - so it is now on  
@@ -309,7 +311,7 @@ void eventMIDIConnected(unsigned long tNow)
 // Lost MIDI connection
 void eventMIDIDropped(unsigned long tNow)
 {
-  Serial.println(F("\nMIDI drop"));
+  Serial.println(F("\n!MIDI"));
   digitalWrite(MIDI_LED, HIGH);
 #ifndef NOTE_LED
   bNOTELEDState = false; // MIDI LED doubles up as NOTE LED - so it is now off  
@@ -325,7 +327,7 @@ void eventMIDIDropped(unsigned long tNow)
 // Playing has started
 void eventPLAYStarted(unsigned long tNow)
 {
-  Serial.println(F("\nPlaying"));
+  Serial.println(F("\nPlay"));
 #ifdef NOTE_LED
   digitalWrite(NOTE_LED, LOW);
   bNOTELEDState = true;
@@ -373,18 +375,23 @@ void eventPLAYStopped(unsigned long tNow)
 // Session started
 void eventSESSIONStarted(unsigned long tNow)
 {
-  Serial.println(F("\nSession Started"));
+  Serial.println(F("\nSession"));
   digitalWrite(SENT_LED, HIGH); // Clear Sent LED  
   SENTTime = 0;
   bSession = true;
   bSessionComplete = false;
   sessionStartTime = tNow;
+  // Clear record of how many times each note has been played...
+  for (short int key = 0; key < MAX_KEY_VALUE; key++)
+  {
+    NotesPlayed[key]=0;
+  }
 }
 
 // Minimum session duration reached
 void eventSESSIONComplete(void)
 {
-  Serial.println(F("\nMin Session Done"));
+  Serial.println(F("\nMin Done"));
   digitalWrite(SESSION_LED, LOW);
   bSessionComplete = true;
 #ifdef _BLYNK  
@@ -394,13 +401,13 @@ void eventSESSIONComplete(void)
 
 boolean eventSESSIONSend(unsigned int TotalDuration, unsigned int TotalNotes, unsigned int SessionDuration)
 {
-  Serial.print(F("\nSummary: "));
-  Serial.print(TotalNotes);
-  Serial.print(F(" notes in "));
-  Serial.print(TotalDuration);
-  Serial.print(F("s; over "));
-  Serial.print(SessionDuration);
-  Serial.println(F("s."));
+//Serial.print(F("\nSummary: "));
+//Serial.print(TotalNotes);
+//Serial.print(F(" notes in "));
+//Serial.print(TotalDuration);
+//Serial.print(F("s; over "));
+//Serial.print(SessionDuration);
+//Serial.println(F("s."));
   
 #ifdef _IFTTT
   return (IFTTTEvent(TotalDuration, TotalNotes, SessionDuration));
@@ -427,55 +434,59 @@ void eventSESSIONReset(void)
 
 void MIDIDecode(int cmd)
 {
-  if (0xF0 == (cmd & 0xF0))    
+  if ((cmd & 0xF0) == 0xF0)    
   {
     // System Common and Real Time 
     switch (cmd & 0x0F)
     {
     // System Common  
     case 0: // System Exclusive
-      Serial.println(F("se")); 
+      //Serial.println(F("se")); 
       // variable number of data bytes
       DataBytesExpected = MAX_SYSTEM_EXCLUSIVE_LEN;
       break;
     case 1: // Quarter Frame
-      Serial.println(F("qf"));  
+      //Serial.println(F("qf"));  
+      // 1 byte of data
+      //DataBytesExpected = 1;
+      //break;
+      // fall through
+    case 3: // Song Select
+      //Serial.println(F("ss"));  
       // 1 byte of data
       DataBytesExpected = 1;
       break;
     case 2: // Song Position pointer
-      Serial.println(F("spp"));      
+      //Serial.println(F("spp"));      
       // 2 bytes of data
       DataBytesExpected = 2;
       break;      
-    case 3: // Song Select
-      Serial.println(F("ss"));  
-      // 1 byte of data
-      DataBytesExpected = 1;
-      break;
 
     case 7: // System Exclusive End
-      Serial.println(F("see")); 
-      DataBytesExpected = 0;        
-    case 4: // undefined
-    case 5: // undefined
-    case 6: // Tune Request
+      //Serial.println(F("see")); 
+      DataBytesExpected = 0;
+    default:          
+    //case 4: // undefined
+    //case 5: // undefined
+    //case 6: // Tune Request
     // System Real Time (can be interleaved with a System Exclusive)
-    case 8: // Timing Clock
-    case 9: // undefined
-    case 10:  // Start
-    case 11:  // Continue
-    case 12:  // Stop
-    case 13:  // undefined
-    case 14:  // Active Sensing
-    case 15:  // System Reset
+    //case 8: // Timing Clock
+      // These events seen in Yamaha Keyboard output...
+    //case 9: // undefined
+    //case 10:  // Start
+    //case 11:  // Continue
+    //case 12:  // Stop
+    //case 13:  // undefined
+    //case 14:  // Active Sensing
+    //case 15:  // System Reset
+      // These events seen in Yamaha Keyboard output...
       //Serial.print(F("{"));
       //Serial.print(cmd, DEC);
       //Serial.println(F("}"));    
       break;
     }
   }
-  else if (0 != (cmd & 0xF0))
+  else if (0 != (cmd & 0x80))
   {
     // Top Bit Set
     RunningStatus = cmd & 0xF0;
@@ -489,6 +500,12 @@ void MIDIDecode(int cmd)
     case 0x80:  // Note Off
       //Serial.println(F("Note Off"));
       DecodeState = DECODE_KEY;
+      DataBytesExpected = 0;
+      break;
+    default:
+      //Serial.print(F("["));
+      //Serial.print(cmd, DEC);
+      //Serial.println(F("]"));  
       break;
     // Messages with two following bytes  
     //case 0xA0:  // Polyphoneic Aftertouch
@@ -513,6 +530,7 @@ void MIDIDecode(int cmd)
     if (0 < DataBytesExpected)
     {
       // We have received a message which is followed by data bytes which we need to skip over
+      //Serial.println(F("-"));
       DataBytesExpected--;
     }
     else
@@ -545,20 +563,24 @@ void MIDIDecode(int cmd)
           break;
         case DECODE_VELOCITY:
           DecodeState = DECODE_KEY;
-          Velocity = cmd;
-          if ((RunningStatus == 0x90) && (Velocity > 0))
+          //Velocity = cmd;
+          if ((0x90 == RunningStatus) && (cmd > 0))
           {
             // Actually received a complete Note On
+            NotesPlayed[Key]++; // Increase count of specific note
             notes++;
             //Serial.print("N");
             toggleNOTE_LED();
           }
-          break;              
+          break;
+        default:
+          break;                
         }
         break;
       
       default:
         // Ignore data byte from any other command
+        //Serial.println(F("D?"));
         break;
       }
     }  
@@ -577,18 +599,41 @@ void toggleNOTE_LED(void)
 #endif  
 }
 
+#define SUSPICIOUS_RATIO  (5) //i.e. one note representing more than 20% of those played
 void playingUpdate(unsigned long timeNow)
 {
   TotalNotes += notes;
   
   if (lastPlayTime)
   {
-    Serial.print(F("\nNotes:"));
-    Serial.println(notes);
+    Serial.print(F("\nNotes:")); Serial.println(notes);
     
     TotalDuration += (timeNow - lastPlayTime);
     if (!bSessionComplete)
     {
+      if (500 < TotalNotes)
+      {
+        // Check for Automated play - style
+        short int DiscreteNotes = 0;
+        short int MaxTimesPlayed = 0;
+        for (short int key = 0; key <= MAX_KEY_VALUE; key++)
+        {
+          // Scan all played notes to compile some statistics
+          if (NotesPlayed[key])
+          {
+            if (MaxTimesPlayed < NotesPlayed[key]) MaxTimesPlayed = NotesPlayed[key];
+            DiscreteNotes++;
+          }
+        }
+        // Decision Logic
+        Serial.print(F("Tot:")); Serial.println(TotalNotes);
+        Serial.print(F("Max:")); Serial.println(MaxTimesPlayed);
+        Serial.print(F("Dis:")); Serial.println(DiscreteNotes);
+        if (MaxTimesPlayed > (TotalNotes / SUSPICIOUS_RATIO))
+        {
+          Serial.println(F("Suspicious!"));
+        }
+      }
       // Check for Practice Session Completion
       if (u16MinSessionSeconds < (TotalDuration/1000))
       {
@@ -657,21 +702,8 @@ void MIDIScan(unsigned long timeNow)
     {
       eventMIDIConnected(timeNow);
     }
-    MIDIconnectedTime = timeNow;
-       
-    int cmd = Serial1.read();
-
-    if (bDebug && (cmd == 'N'))
-    {
-      // Pretend we received a valid note
-      notes++;
-      Serial.print("N");
-      toggleNOTE_LED();      
-    }
-    else
-    {
-      MIDIDecode(cmd);
-    }
+    MIDIconnectedTime = timeNow;     
+    MIDIDecode(Serial1.read());
   }
     
   if (MIN_NOTES < notes)
@@ -697,7 +729,7 @@ void processTimeouts(unsigned long timeNow)
   {
     if (SENT_LED_TIMEOUT < (timeNow - SENTTime))
     {
-      Serial.println(F("Sent LED Off"));
+      Serial.println(F("!Sent"));
       digitalWrite(SENT_LED, HIGH);
       SENTTime = 0;
     }
@@ -778,7 +810,7 @@ void setupIFTTT(void)
   Serial.println(F("\nInit"));
   if (!cc3000.begin())
   {
-    Serial.println(F("H/W fault?"));
+    Serial.println(F("H/W?"));
     while(1);
   }
    
@@ -788,11 +820,10 @@ void setupIFTTT(void)
     Serial.println(F("Fail"));
     while(1);
   }
-   
-  Serial.println(F("Connected"));
+  Serial.println(F("..ed"));
   
   /* Wait for DHCP to complete */
-  Serial.println(F("Rq DHCP"));
+  Serial.println(F("DHCP"));
   while (!cc3000.checkDHCP())
   {
     delay(1000);
@@ -800,16 +831,16 @@ void setupIFTTT(void)
 
   ip = 0;
   // Try looking up the website's IP address
-  Serial.print(WEBSITE); Serial.print(F(" -> "));
+  Serial.print(WEBSITE); Serial.print(F("->"));
   while (ip == 0) 
   {
     if (!cc3000.getHostByName(WEBSITE, &ip)) 
     {
-      Serial.println(F("Couldn't resolve"));
+      Serial.println(F("!resolve"));
     }
     if (ip == 0x7f000001)
     {
-      Serial.println(F("Localhost"));
+      Serial.println(F("wa"));
       ip = 0; // Work around for DNS returning local host which is WRONG
               // force it to try again
     }
@@ -848,14 +879,14 @@ boolean IFTTTEvent(unsigned int u16A, unsigned int u16B, unsigned int u16C)
   /* Try connecting to the website.
      Note: HTTP/1.1 protocol is used to keep the server from closing the connection before all data is read.
   */
-  Serial.println(F("Connecting to server"));  
+  Serial.println(F("S"));  
   Adafruit_CC3000_Client www = cc3000.connectTCP(ip, 80);
 
   if (www.connected()) 
   {
     connectionFailures = 0;
     
-    Serial.println(F("\nSend Event to IFTTT"));
+    Serial.println(F("\nSend"));
     www.fastrprint(F("POST "));  www.fastrprint(F(WEBPAGE));   www.fastrprintln(F(" HTTP/1.1"));
     www.fastrprint(F("Host: ")); www.fastrprintln(F(WEBSITE));
     
@@ -879,7 +910,7 @@ boolean IFTTTEvent(unsigned int u16A, unsigned int u16B, unsigned int u16C)
 #endif    
     www.fastrprintln("");
     www.println();
-    Serial.println(F("Parse response:"));
+    Serial.println(F("Parse"));
         
     /* Read data until either the connection is closed, or the idle timeout is reached. */ 
     unsigned long lastRead = millis();
@@ -892,14 +923,14 @@ boolean IFTTTEvent(unsigned int u16A, unsigned int u16B, unsigned int u16C)
       while (www.available()) 
       {
         char c = www.read();
-        Serial.print(c);
+        //Serial.print(c);
         lastRead = millis();
         if (!bSuccess)
         {
           // Check for a key word in the response which confirms that the send was OK
           if (c == expectedReply[index])
           {
-            Serial.print('=');
+            //Serial.print('=');
             if (CONFIRMATION_LENGTH == ++index)
             {
               // We have received the expected response
@@ -908,14 +939,14 @@ boolean IFTTTEvent(unsigned int u16A, unsigned int u16B, unsigned int u16C)
           }
           else if (index)
           {
-            Serial.print('^');
+            //Serial.print('^');
             index = 0;        // Character missmatch - start checking again from start of string 
           }
         }
       }
     }
     
-    Serial.println();
+    //Serial.println();
     
     if (bSuccess)
     {
@@ -924,20 +955,20 @@ boolean IFTTTEvent(unsigned int u16A, unsigned int u16B, unsigned int u16C)
       SENTTime = lastRead;     
     }          
     
-    Serial.println(F("Close"));
+    Serial.println(F("C"));
     www.close();
     
     return(true);
   } 
   else 
   {
-    Serial.println(F("Conn fail"));
+    Serial.println(F("F"));
     if (2 < ++connectionFailures)
     {
       // Force reconnection
-      Serial.println(F("Disconnect"));
+      Serial.println(F("D"));
       cc3000.disconnect();   
-      Serial.println(F("Rebooting"));
+      Serial.println(F("R"));
       cc3000.reboot();   
       bWIFIConnected = false;
     }
