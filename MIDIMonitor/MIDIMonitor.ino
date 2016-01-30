@@ -61,9 +61,9 @@
 
 // Other pins for LEDs - which are ACTIVE Low
 #define WIFI_LED              18        // Wifi is connected
-#define MIDI_LED               5        // MIDI is connected
-//#define NOTE_LED             6        // Playing Detected
-#define SESSION_LED            7        // Minimum practice completed
+#define MIDI_LED               5        // MIDI is connected (flashes with notes if no seperate NOTE_LED)
+//#define NOTE_LED             6        // Playing Detected (flashes with notes)
+#define SESSION_LED            7        // Minimum practice completed (flashes on suspicious play detected)
 #define SENT_LED               9        // Record sent to Internet
 
 #define DEBUG_PIN             19        // DEBUG Mode Input
@@ -115,12 +115,17 @@ Adafruit_CC3000 cc3000 = Adafruit_CC3000(ADAFRUIT_CC3000_CS, ADAFRUIT_CC3000_IRQ
 #endif // _IFTTT
  
 
+// Playing Characteristics Monitoring to filter out automated play/styles
+#define SUSPICIOUS_RATIO  (5) //i.e. one note representing more than 20% of those played
+// Once suspicious play has been detected this can be reset by disconnecting MIDI.
+
 // MIDI protocol decode state machine states
 #define DECODE_KEY      1
 #define DECODE_VELOCITY 2
 
 #define MAX_KEY_VALUE (127)
-int RunningStatus = 0x90; // Default to Note On Events
+
+int RunningStatus = 0x90; // Default to Note On Events (Keyboard makes heavy use of RunningStatus and so we may have missed the NoteOn) 
 int DecodeState = DECODE_KEY;
 int Key = 0;
 //int Velocity = 0;
@@ -131,47 +136,37 @@ short int NotesPlayed[MAX_KEY_VALUE+1];
 unsigned int u16MinSessionSeconds;
 
 // Tracking of MIDI connection status
-boolean bMIDIConnected;
-unsigned long MIDIconnectedTime;
+boolean bMIDIConnected = false;
+unsigned long MIDIconnectedTime = 0;
 
 // Tracking of WIFI connection status
 boolean bWIFIConnected;
 unsigned long WIFIconnectedTime;
 
 // Tracking of Sent LED status
-unsigned long SENTTime;
+unsigned long SENTTime = 0;
 
 // Tracking of NOTE LED status
 boolean bNOTELEDState;
   
 // Tracking of Playing
-boolean bPlaying;
-unsigned int notes;
-unsigned long TotalNotes;
-unsigned long TotalDuration;
+boolean bPlaying = false;
+unsigned int notes = 0;
+unsigned int TotalNotes = 0;
+unsigned int LastAnalysisNotes = 0;
+unsigned long TotalDuration = 0;
 unsigned long startPlayTime;
-unsigned long lastPlayTime;
-unsigned long sessionStartTime;
-boolean bSession;
-boolean bSessionComplete;
+unsigned long lastPlayTime = 0;
+unsigned long sessionStartTime = 0;
+boolean bSession = false;
+boolean bSessionComplete = false;
+boolean bSuspiciousPlay = false;
 
 unsigned long lastSendTime;
 boolean bDebug = false;
 
 void setup()
 {
-  notes = 0;
-  TotalNotes = 0;
-  TotalDuration = 0;
-  lastPlayTime = 0;
-  sessionStartTime = 0;
-  MIDIconnectedTime = 0;
-  SENTTime = 0;
-  bMIDIConnected = false;
-  bPlaying = false;
-  bSession = false;
-  bSessionComplete = false;
-
   // Initialise UART for serial debug messages asap
   Serial.begin(115200);
       
@@ -188,8 +183,8 @@ void setup()
   if (!digitalRead(DEBUG_PIN))
 #endif  
   {
-    delay(1000);    
-    Serial.println(F("\nD"));
+    //delay(1000);    
+    //Serial.println(F("\nD"));
     bDebug = true;
     u16MinSessionSeconds = DEBUG_SESSION_DURATION;
 #ifdef DEBUG_LED 
@@ -218,7 +213,7 @@ void setup()
   pinMode(SESSION_LED, OUTPUT);
   digitalWrite(SESSION_LED, HIGH);
   
-  // WiFi Connected (and Hence READY) LED
+  // WiFi Connected LED
   pinMode(WIFI_LED, OUTPUT);
   digitalWrite(WIFI_LED, HIGH);
 
@@ -363,6 +358,10 @@ void eventPLAYStopped(unsigned long tNow)
     bNOTELEDState = true;
   }
 #endif  
+  if (bSuspiciousPlay)
+  {
+    digitalWrite(SESSION_LED, HIGH);  // Ensure Session LED is Off is there has been suspicious play
+  }
   bPlaying = false;
   // lastPlayTime = 0; Need to remember lastPlayTime to check for session being resumed.
 #ifdef _BLYNK  
@@ -422,12 +421,21 @@ void eventSESSIONReset(void)
   digitalWrite(SESSION_LED, HIGH);
   bSession = false;
   bSessionComplete = false;
+  bSuspiciousPlay = false;
   TotalDuration = 0;
   TotalNotes = 0;
 #ifdef _BLYNK  
   Blynk.virtualWrite(V2, 0);
   Blynk.virtualWrite(V3, LOW);          
 #endif  
+}
+
+// Suspicious Play
+void eventSuspiciousPlay(void)
+{
+  //eventSESSIONReset();
+  // Make the Session LED flash with the Notes
+  bSuspiciousPlay = true;  
 }
 
 #define MAX_SYSTEM_EXCLUSIVE_LEN  (30000)
@@ -596,10 +604,46 @@ void toggleNOTE_LED(void)
 #else
   // Toggle MIDI_LED to show that playing had been detected (as there is no dedicated NOTE_LED)
   digitalWrite(MIDI_LED, bNOTELEDState);
-#endif  
+#endif
+  if (bSuspiciousPlay)
+  {
+    // If we have detected suspicious play then flash the session LED as well
+    digitalWrite(SESSION_LED, bNOTELEDState);  
+  }
 }
 
-#define SUSPICIOUS_RATIO  (5) //i.e. one note representing more than 20% of those played
+// Check for Automated play - style
+boolean playAnalysis(void)
+{
+  short int DiscreteNotes = 0;
+  short int MaxTimesPlayed = 0;
+
+  for (short int key = 0; key <= MAX_KEY_VALUE; key++)
+  {
+    // Scan all played notes to compile some statistics
+    if (NotesPlayed[key])
+    {
+      if (MaxTimesPlayed < NotesPlayed[key]) MaxTimesPlayed = NotesPlayed[key];
+      // Other ideas - second most played note?
+      // 
+      DiscreteNotes++;
+    }
+  }
+  
+  // Decision Logic
+  Serial.print(F("Tot:")); Serial.println(TotalNotes);
+  Serial.print(F("Max:")); Serial.println(MaxTimesPlayed);
+  Serial.print(F("Dis:")); Serial.println(DiscreteNotes);
+  
+  if (MaxTimesPlayed > (TotalNotes / SUSPICIOUS_RATIO))
+  {
+    Serial.println(F("Suspicious!"));
+    return(true);
+  }
+  return(false); 
+}
+
+
 void playingUpdate(unsigned long timeNow)
 {
   TotalNotes += notes;
@@ -611,33 +655,21 @@ void playingUpdate(unsigned long timeNow)
     TotalDuration += (timeNow - lastPlayTime);
     if (!bSessionComplete)
     {
-      if (500 < TotalNotes)
+      if (500 < (TotalNotes - LastAnalysisNotes))
       {
-        // Check for Automated play - style
-        short int DiscreteNotes = 0;
-        short int MaxTimesPlayed = 0;
-        for (short int key = 0; key <= MAX_KEY_VALUE; key++)
+        LastAnalysisNotes = TotalNotes;
+        if (playAnalysis())
         {
-          // Scan all played notes to compile some statistics
-          if (NotesPlayed[key])
-          {
-            if (MaxTimesPlayed < NotesPlayed[key]) MaxTimesPlayed = NotesPlayed[key];
-            DiscreteNotes++;
-          }
-        }
-        // Decision Logic
-        Serial.print(F("Tot:")); Serial.println(TotalNotes);
-        Serial.print(F("Max:")); Serial.println(MaxTimesPlayed);
-        Serial.print(F("Dis:")); Serial.println(DiscreteNotes);
-        if (MaxTimesPlayed > (TotalNotes / SUSPICIOUS_RATIO))
-        {
-          Serial.println(F("Suspicious!"));
+          eventSuspiciousPlay();
         }
       }
-      // Check for Practice Session Completion
-      if (u16MinSessionSeconds < (TotalDuration/1000))
+      if (!bSuspiciousPlay)
       {
-        eventSESSIONComplete();
+        // Check for Practice Session Completion
+        if (u16MinSessionSeconds < (TotalDuration/1000))
+        {
+          eventSESSIONComplete();
+        }
       }
     } 
   }
@@ -747,7 +779,7 @@ void processTimeouts(unsigned long timeNow)
   else if (bSession)
   {
     // Time period since last note or MIDI disconnected for timeout period
-    if ((SESSION_TIMEOUT < (timeNow - lastPlayTime)) || (!bMIDIConnected && bSessionComplete))
+    if ((SESSION_TIMEOUT < (timeNow - lastPlayTime)) || (!bMIDIConnected && (bSuspiciousPlay || bSessionComplete)))
     {
       // No practice for a while - session has ended
       if (bSessionComplete)
