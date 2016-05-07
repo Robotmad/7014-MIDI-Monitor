@@ -103,7 +103,11 @@ StaticJsonBuffer<200> jsonBuffer;
 // 
 // What page to grab!
 #define WEBSITE      "maker.ifttt.com"
-#define WEBPAGE     "/trigger/keyboard_played_for_10_minutes/with/key/RFb7kSPvPoz7xvE9puBO-"
+// Christopher's Maker Channel
+#define WEBPAGE1     "/trigger/KP10M/with/key/RFb7kSPvPoz7xvE9puBO-"
+// Lincoln's Maker Channel
+#define WEBPAGE2     "/trigger/KP10M/with/key/bpTkr8FwmbvXh3J1okO6cm"
+
 uint32_t ip;
 
 Adafruit_CC3000 cc3000 = Adafruit_CC3000(ADAFRUIT_CC3000_CS, ADAFRUIT_CC3000_IRQ, ADAFRUIT_CC3000_VBAT,
@@ -238,7 +242,7 @@ void setup()
 
 #define NUM_LEDS      (4)   // number of  LEDs in test sequence
 #define LED_ON_PERIOD (400) // mS
-int pins[NUM_LEDS] = {MIDI_LED, SESSION_LED, WIFI_LED, SENT_LED};
+int pins[NUM_LEDS] = {MIDI_LED, SESSION_LED, SENT_LED, WIFI_LED};
 
 void LEDTest(void)
 {
@@ -409,7 +413,8 @@ boolean eventSESSIONSend(unsigned int TotalDuration, unsigned int TotalNotes, un
 //Serial.println(F("s."));
   
 #ifdef _IFTTT
-  return (IFTTTEvent(TotalDuration, TotalNotes, SessionDuration));
+  IFTTTEvent(F(WEBPAGE2),TotalDuration, TotalNotes, SessionDuration);  
+  return (IFTTTEvent(F(WEBPAGE1),TotalDuration, TotalNotes, SessionDuration));
 #endif  
 }
 
@@ -891,9 +896,8 @@ void setupIFTTT(void)
 int connectionFailures = 0;
 
 // Send Practice Complete Event
-boolean IFTTTEvent(unsigned int u16A, unsigned int u16B, unsigned int u16C)
+boolean IFTTTEvent(const __FlashStringHelper* pWebPage, unsigned int u16A, unsigned int u16B, unsigned int u16C)
 {
-  
   if (bWIFIConnected)
   {
     // We think we have a connection - check again now (including DHCP)
@@ -919,7 +923,7 @@ boolean IFTTTEvent(unsigned int u16A, unsigned int u16B, unsigned int u16C)
     connectionFailures = 0;
     
     Serial.println(F("\nSend"));
-    www.fastrprint(F("POST "));  www.fastrprint(F(WEBPAGE));   www.fastrprintln(F(" HTTP/1.1"));
+    www.fastrprint(F("POST "));  www.fastrprint(pWebPage);   www.fastrprintln(F(" HTTP/1.1"));
     www.fastrprint(F("Host: ")); www.fastrprintln(F(WEBSITE));
     
 #ifdef _JSON
@@ -944,47 +948,11 @@ boolean IFTTTEvent(unsigned int u16A, unsigned int u16B, unsigned int u16C)
     www.println();
     Serial.println(F("Parse"));
         
-    /* Read data until either the connection is closed, or the idle timeout is reached. */ 
-    unsigned long lastRead = millis();
-    const char PROGMEM expectedReply[] = CONFIRMATION_STRING;
-    int index = 0;
-    boolean bSuccess = false;
-   
-    while (www.connected() && (millis() - lastRead < IDLE_TIMEOUT_MS)) 
-    {
-      while (www.available()) 
-      {
-        char c = www.read();
-        //Serial.print(c);
-        lastRead = millis();
-        if (!bSuccess)
-        {
-          // Check for a key word in the response which confirms that the send was OK
-          if (c == expectedReply[index])
-          {
-            //Serial.print('=');
-            if (CONFIRMATION_LENGTH == ++index)
-            {
-              // We have received the expected response
-              bSuccess = true;    
-            }
-          }
-          else if (index)
-          {
-            //Serial.print('^');
-            index = 0;        // Character missmatch - start checking again from start of string 
-          }
-        }
-      }
-    }
-    
-    //Serial.println();
-    
-    if (bSuccess)
+    if (IFTTTCheckReply(&www))
     {
       Serial.println(F("OK"));
       digitalWrite(SENT_LED, LOW); 
-      SENTTime = lastRead;     
+      SENTTime = millis();     
     }          
     
     Serial.println(F("C"));
@@ -1007,6 +975,44 @@ boolean IFTTTEvent(unsigned int u16A, unsigned int u16B, unsigned int u16C)
     www.stop();    
   }
   return (false);
+}
+
+bool IFTTTCheckReply(Adafruit_CC3000_Client *www)
+{
+    /* Read data until either the connection is closed, or the idle timeout is reached. */ 
+    unsigned long lastRead = millis();
+    const char PROGMEM expectedReply[] = CONFIRMATION_STRING;
+    int index = 0;
+    boolean bSuccess = false;
+   
+    while (www->connected() && (millis() - lastRead < IDLE_TIMEOUT_MS)) 
+    {
+      while (www->available()) 
+      {
+        char c = www->read();
+        //Serial.print(c);
+        lastRead = millis();
+        if (!bSuccess)
+        {
+          // Check for a key word in the response which confirms that the send was OK
+          if (c == expectedReply[index])
+          {
+            //Serial.print('=');
+            if (CONFIRMATION_LENGTH == ++index)
+            {
+              // We have received the expected response
+              bSuccess = true;    
+            }
+          }
+          else if (index)
+          {
+            //Serial.print('^');
+            index = 0;        // Character missmatch - start checking again from start of string 
+          }
+        }
+      }
+    }
+    return(bSuccess);
 }
 
 #endif  // _IFTTT
