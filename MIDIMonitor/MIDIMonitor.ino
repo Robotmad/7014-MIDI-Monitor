@@ -48,7 +48,7 @@
 #define WLAN_PASS       "coderdojo"
 #define WLAN_SECURITY   WLAN_SEC_WPA2
 #else
-#define WLAN_SSID       "Robotmad"
+#define WLAN_SSID       "RobotmadUP"
 #define WLAN_PASS       "mou3se43"
 #define WLAN_SECURITY   WLAN_SEC_WPA2
 #endif
@@ -202,7 +202,7 @@ void setup()
     digitalWrite(DEBUG_LED, LOW);
 #endif    
   }
-  
+
   // Connections Established LED  
   pinMode(MIDI_LED, OUTPUT);
   digitalWrite(MIDI_LED, HIGH);
@@ -227,7 +227,7 @@ void setup()
 
   // LED test pattern so that user can check all is well...
   LEDTest();
-  LEDTest();
+  //LEDTest();
     
   Serial1.begin(31250); // MIDI Baud Rate
     
@@ -237,20 +237,23 @@ void setup()
 #ifdef _IFTTT
   setupIFTTT();
 #endif
-  Serial.println(F("\nR"));
+  //Serial.println(F("\nR"));
 }
 
 #define NUM_LEDS      (4)   // number of  LEDs in test sequence
-#define LED_ON_PERIOD (400) // mS
+#define LED_ON_PERIOD (200) // mS
 int pins[NUM_LEDS] = {MIDI_LED, SESSION_LED, SENT_LED, WIFI_LED};
 
 void LEDTest(void)
 {
-  for (int i=0; i<NUM_LEDS; i++)
+  for (int j=0; j<5; j++)
   {
-    digitalWrite(pins[i], LOW); // LED on
-    delay(bDebug?(2000):LED_ON_PERIOD); // Slow flashes if debug mode
-    digitalWrite(pins[i], HIGH);  // LED off
+    for (int i=0; i<NUM_LEDS; i++)
+    {
+      digitalWrite(pins[i], LOW); // LED on
+      delay(bDebug?(2000):LED_ON_PERIOD); // Slow flashes if debug mode
+      digitalWrite(pins[i], HIGH);  // LED off
+    }
   }
 }
 
@@ -276,7 +279,7 @@ void loop()
 // detected that WIFI is connected
 void eventWIFIConnected(unsigned long tNow)
 {      
-  Serial.println(F("\nWIFI"));
+  Serial.println(F("\nW"));
   digitalWrite(WIFI_LED, LOW);  
   bWIFIConnected = true;
   WIFIconnectedTime = tNow;
@@ -285,7 +288,7 @@ void eventWIFIConnected(unsigned long tNow)
 // Lost WIFI connection
 void eventWIFIDropped(unsigned long tNow)
 {
-  Serial.println(F("\n!WIFI"));
+  //Serial.println(F("\n!W"));
   digitalWrite(WIFI_LED, HIGH);
   bWIFIConnected = false;
   WIFIconnectedTime = 0;
@@ -294,7 +297,7 @@ void eventWIFIDropped(unsigned long tNow)
 // detected that MIDI is connected
 void eventMIDIConnected(unsigned long tNow)
 {      
-  Serial.println(F("\nMIDI"));
+  //Serial.println(F("\nM"));
   digitalWrite(MIDI_LED, LOW);
 #ifndef NOTE_LED
   bNOTELEDState = true; // MIDI LED doubles up as NOTE LED - so it is now on  
@@ -310,7 +313,7 @@ void eventMIDIConnected(unsigned long tNow)
 // Lost MIDI connection
 void eventMIDIDropped(unsigned long tNow)
 {
-  Serial.println(F("\n!MIDI"));
+  //Serial.println(F("\n!M"));
   digitalWrite(MIDI_LED, HIGH);
 #ifndef NOTE_LED
   bNOTELEDState = false; // MIDI LED doubles up as NOTE LED - so it is now off  
@@ -326,7 +329,7 @@ void eventMIDIDropped(unsigned long tNow)
 // Playing has started
 void eventPLAYStarted(unsigned long tNow)
 {
-  Serial.println(F("\nPlay"));
+  //Serial.println(F("\nP"));
 #ifdef NOTE_LED
   digitalWrite(NOTE_LED, LOW);
   bNOTELEDState = true;
@@ -348,9 +351,9 @@ void eventPLAYStarted(unsigned long tNow)
 // No notes for a period
 void eventPLAYStopped(unsigned long tNow)
 {
-  Serial.print(F("\nPlayed ("));
-  Serial.print((lastPlayTime - startPlayTime)/1000);
-  Serial.println(F("s)"));
+  //Serial.print(F("\nPd ("));
+  //Serial.print((lastPlayTime - startPlayTime)/1000);
+  //Serial.println(F("s)"));
 #ifdef NOTE_LED  
   digitalWrite(NOTE_LED, HIGH);
   bNOTELEDState = false; // NOTE LED - so it is now off
@@ -378,7 +381,7 @@ void eventPLAYStopped(unsigned long tNow)
 // Session started
 void eventSESSIONStarted(unsigned long tNow)
 {
-  Serial.println(F("\nSession"));
+  //Serial.println(F("\nS"));
   digitalWrite(SENT_LED, HIGH); // Clear Sent LED  
   SENTTime = 0;
   bSession = true;
@@ -394,7 +397,7 @@ void eventSESSIONStarted(unsigned long tNow)
 // Minimum session duration reached
 void eventSESSIONComplete(void)
 {
-  Serial.println(F("\nMin Done"));
+  //Serial.println(F("\nDone"));
   digitalWrite(SESSION_LED, LOW);
   bSessionComplete = true;
 #ifdef _BLYNK  
@@ -422,7 +425,7 @@ boolean eventSESSIONSend(unsigned int TotalDuration, unsigned int TotalNotes, un
 // Timeout since session (or session has been reported) - new playing would be a new session
 void eventSESSIONReset(void)
 {
-  Serial.println(F("\nReset"));
+  //Serial.println(F("\nRst"));
   digitalWrite(SESSION_LED, HIGH);
   bSession = false;
   bSessionComplete = false;
@@ -636,13 +639,13 @@ boolean playAnalysis(void)
   }
   
   // Decision Logic
-  Serial.print(F("Tot:")); Serial.println(TotalNotes);
-  Serial.print(F("Max:")); Serial.println(MaxTimesPlayed);
-  Serial.print(F("Dis:")); Serial.println(DiscreteNotes);
+  //Serial.print(F("Tot:")); Serial.println(TotalNotes);
+  //Serial.print(F("Max:")); Serial.println(MaxTimesPlayed);
+  //Serial.print(F("Dis:")); Serial.println(DiscreteNotes);
   
   if (MaxTimesPlayed > (TotalNotes / SUSPICIOUS_RATIO))
   {
-    Serial.println(F("Suspicious!"));
+    //Serial.println(F("Suspicious!"));
     return(true);
   }
   return(false); 
@@ -655,7 +658,7 @@ void playingUpdate(unsigned long timeNow)
   
   if (lastPlayTime)
   {
-    Serial.print(F("\nNotes:")); Serial.println(notes);
+    //Serial.print(F("\nN:")); Serial.println(notes);
     
     TotalDuration += (timeNow - lastPlayTime);
     if (!bSessionComplete)
@@ -766,7 +769,7 @@ void processTimeouts(unsigned long timeNow)
   {
     if (SENT_LED_TIMEOUT < (timeNow - SENTTime))
     {
-      Serial.println(F("!Sent"));
+      //Serial.println(F("!St"));
       digitalWrite(SENT_LED, HIGH);
       SENTTime = 0;
     }
@@ -844,23 +847,23 @@ void setupBlynk(void)
 void setupIFTTT(void)
 {
   /* Initialise the module */
-  Serial.println(F("\nInit"));
+  //Serial.println(F("\nInit"));
   if (!cc3000.begin())
   {
-    Serial.println(F("H/W?"));
+    //Serial.println(F("H/W?"));
     while(1);
   }
    
-  Serial.print(F("\nConnect:")); Serial.println(WLAN_SSID);
+  //Serial.print(F("\nC:")); Serial.println(WLAN_SSID);
   if (!cc3000.connectToAP(WLAN_SSID, WLAN_PASS, WLAN_SECURITY, WLAN_RETRIES)) 
   {
-    Serial.println(F("Fail"));
+    //Serial.println(F("Fail"));
     while(1);
   }
-  Serial.println(F("..ed"));
+  //Serial.println(F("d"));
   
   /* Wait for DHCP to complete */
-  Serial.println(F("DHCP"));
+  //Serial.println(F("DHCP"));
   while (!cc3000.checkDHCP())
   {
     delay(1000);
@@ -868,16 +871,16 @@ void setupIFTTT(void)
 
   ip = 0;
   // Try looking up the website's IP address
-  Serial.print(WEBSITE); Serial.print(F("->"));
+  //Serial.print(WEBSITE); Serial.print(F("->"));
   while (ip == 0) 
   {
     if (!cc3000.getHostByName(WEBSITE, &ip)) 
     {
-      Serial.println(F("!resolve"));
+      //Serial.println(F("!ip"));
     }
     if (ip == 0x7f000001)
     {
-      Serial.println(F("wa"));
+      //Serial.println(F("wa"));
       ip = 0; // Work around for DNS returning local host which is WRONG
               // force it to try again
     }
@@ -915,14 +918,14 @@ boolean IFTTTEvent(const __FlashStringHelper* pWebPage, unsigned int u16A, unsig
   /* Try connecting to the website.
      Note: HTTP/1.1 protocol is used to keep the server from closing the connection before all data is read.
   */
-  Serial.println(F("S"));  
+  //Serial.println(F("S"));  
   Adafruit_CC3000_Client www = cc3000.connectTCP(ip, 80);
 
   if (www.connected()) 
   {
     connectionFailures = 0;
     
-    Serial.println(F("\nSend"));
+    //Serial.println(F("\nSend"));
     www.fastrprint(F("POST "));  www.fastrprint(pWebPage);   www.fastrprintln(F(" HTTP/1.1"));
     www.fastrprint(F("Host: ")); www.fastrprintln(F(WEBSITE));
     
@@ -946,29 +949,29 @@ boolean IFTTTEvent(const __FlashStringHelper* pWebPage, unsigned int u16A, unsig
 #endif    
     www.fastrprintln("");
     www.println();
-    Serial.println(F("Parse"));
+    //Serial.println(F("Parse"));
         
     if (IFTTTCheckReply(&www))
     {
-      Serial.println(F("OK"));
+      //Serial.println(F("OK"));
       digitalWrite(SENT_LED, LOW); 
       SENTTime = millis();     
     }          
     
-    Serial.println(F("C"));
+    //Serial.println(F("C"));
     www.close();
     
     return(true);
   } 
   else 
   {
-    Serial.println(F("F"));
+    //Serial.println(F("F"));
     if (2 < ++connectionFailures)
     {
       // Force reconnection
-      Serial.println(F("D"));
+      //Serial.println(F("D"));
       cc3000.disconnect();   
-      Serial.println(F("R"));
+      //Serial.println(F("R"));
       cc3000.reboot();   
       bWIFIConnected = false;
     }
