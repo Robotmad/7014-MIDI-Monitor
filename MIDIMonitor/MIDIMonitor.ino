@@ -22,6 +22,8 @@
  *   https://github.com/adafruit/Adafruit_CC3000_Library
  *
  * Note: CC3000 Firmware version 1.14 or later is preferred.
+ * getHostByName must be moved from to be always compiled rather
+ * than only if CC3000_TINY_DRIVER is NOT defined.
  *
  * 1. Update pin definitions according to your setup.
  * 2. Change WiFi ssid, pass, and Blynk auth token
